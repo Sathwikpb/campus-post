@@ -22,7 +22,7 @@
     const url = new URL(root.location.href);
     if (url.searchParams.get('_task') === 'login' || url.searchParams.get('_action') === 'compose' || root.querySelector('input[type=password]')) return null;
     const docs = documents(root);
-    const subjectSelectors = ['#messageheader .subject', '.message-headers .subject', '#message-headers .subject', 'h2.subject', 'h3.subject'];
+    const subjectSelectors = ['#messageheader .subject', '.message-headers .subject', '#message-headers .subject', 'h2.subject', 'h3.subject', '#messageheader .header.subject', '#messageheader td.subject', '#messageheader .header-title', '#message-header .subject'];
     let subject = '';
     for (const doc of [...docs].reverse()) {
       for (const selector of subjectSelectors) {
@@ -49,6 +49,7 @@
       const iso=raw.match(/\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?/);
       if(iso){received=iso[0];break;}
     }
+    if(!subject){const title=root.title||'';subject=title.includes(' :: ')?title.split(' :: ').slice(1).join(' :: '):'';}
     return {subject: subject || 'University email', body,links,received};
   }
   function selection(root = document) {

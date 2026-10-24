@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {JSDOM} from 'jsdom';
+const source=(await fs.readFile('extension/dashboard.js','utf8')).replace(/^import .*;\r?\n/gm,'');
+const html=await fs.readFile('extension/dashboard.html','utf8');
+const wait=()=>new Promise(resolve=>setTimeout(resolve,15));
+async function fixture({failure=false}={}){
+ const dom=new JSDOM(html,{url:'https://extension.invalid/dashboard.html?popup=1',runScripts:'outside-only'}),w=dom.window;
+ const mail={subject:'Fictional course notice',sender:'office@example.invalid',body:'Please register for the course.',key:'INBOX:1'};
+ let contextCalls=0,modelCalls=0,fail=failure;const handoffs=[];
+ Object.defineProperty(w,'parent',{value:{postMessage:message=>handoffs.push(message.type)}});
+ w.HTMLElement.prototype.scrollIntoView=()=>{};
+ w.setInterval=()=>1;
+ w.chrome={storage:{local:{get:async key=>key==='privacyConsent'?{privacyConsent:{version:1}}:{},set:async()=>{}},session:{}},tabs:{query:async()=>[{id:7,title:'TU webmail'}],sendMessage:async()=>{contextCalls++;return fail?{ok:false,error:'Fixture connection unavailable'}:{ok:true,account:'fixture@example.invalid',open:mail};}},runtime:{getURL:p=>'https://extension.invalid/'+p}};
+ w.saveMailSession=async()=>{};w.restoreMailSession=async()=>null;w.hash=async()=> 'fixture-hash';w.splitText=text=>[text];
+ w.analyze=()=>({summary:['Please register for the course.'],events:[],links:[],eligibility:[],schedules:[]});
+ w.overviewFacts=()=>({points:['Please register for the course.'],actions:[],eligibility:[],dates:[]});w.plainEnglish=()=>[];
+ w.local={support:()=>({summary:false,translation:false}),translationReady:()=>false,prepareSummary:async()=>{modelCalls++;throw Error('Fixture model unavailable');}};
+ w.eval(source);await wait();
+ return {dom,w,handoffs,get contextCalls(){return contextCalls;},get modelCalls(){return modelCalls;},recover(){fail=false;}};
+}
+const automatic=await fixture();
+assert.equal(automatic.contextCalls,1,'connect without a tab query parameter');
+assert.match(automatic.w.document.querySelector('#account').textContent,/Connected/);
+assert.match(automatic.w.document.querySelector('#reader').textContent,/Fictional course notice/);
+assert.equal(automatic.modelCalls,0,'email reading must not prepare a summary model');
+assert.deepEqual(automatic.handoffs,['campus-ready'],'full panel takes over only after connection');
+const status=automatic.w.document.querySelector('#status').textContent;
+automatic.w.document.querySelector('#prepare-summary').click();await wait();
+assert.match(automatic.w.document.querySelector('#model-status').textContent,/Fixture model unavailable/);
+assert.equal(automatic.w.document.querySelector('#status').textContent,status,'model error must preserve mailbox status');
+assert.match(automatic.w.document.querySelector('#reader').textContent,/Fictional course notice/);
+automatic.dom.window.close();
+const retry=await fixture({failure:true});assert.match(retry.w.document.querySelector('#status').textContent,/Fixture connection unavailable/);
+assert.deepEqual(retry.handoffs,['campus-fallback'],'keep the local view if connection fails');
+retry.recover();retry.w.document.querySelector('#open-email').click();await wait();
+assert.equal(retry.contextCalls,2,'read button reconnects a disconnected mailbox');
+assert.deepEqual(retry.handoffs,['campus-fallback','campus-ready']);
+assert.match(retry.w.document.querySelector('#reader').textContent,/Fictional course notice/);retry.dom.window.close();
+
+// Classic-style Roundcube content is nested in a same-origin preview frame.
+const classic=new JSDOM('<title>Webmail :: Fictional classic subject</title><iframe id="messagecontframe"></iframe>',{url:'https://webmail.tu-ilmenau.de/?_task=mail',runScripts:'outside-only'});
+const cw=classic.window;Object.defineProperty(cw.Element.prototype,'getClientRects',{value(){return [{}];}});
+const doc=cw.document.querySelector('iframe').contentDocument;
+doc.body.innerHTML='<table id="messageheader"><tr><td class="subject">Fictional classic subject</td></tr></table><div id="messagebody"><p>Please register by 30 October.</p></div>';
+Object.defineProperty(doc.defaultView.Element.prototype,'getClientRects',{value(){return [{}];}});
+Object.defineProperty(doc.querySelector('.subject'),'innerText',{value:'Fictional classic subject'});
+Object.defineProperty(doc.querySelector('#messagebody'),'innerText',{value:'Please register by 30 October.'});
+cw.eval(await fs.readFile('extension/reader.js','utf8'));
+assert.equal(cw.CampusPostReader.read().subject,'Fictional classic subject');assert.match(cw.CampusPostReader.read().body,/register/);classic.window.close();
+console.log('Startup passed: automatic connection, model isolation, reconnect-on-read and classic preview extraction.');

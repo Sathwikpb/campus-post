@@ -70,7 +70,7 @@ import {createLiveView} from './live-view.mjs';
   const title=document.createElement('span');title.textContent='Campus Post ↗';const close=document.createElement('button');close.textContent='×';close.setAttribute('aria-label','Close Campus Post');close.style.cssText='font:18px system-ui;border:1px solid #ffffff55;border-radius:7px;background:transparent;color:white;padding:2px 8px;cursor:pointer';top.append(title,close);panel.append(top);
   let frame,currentTabId=0;
   const live=createLiveView({shadow,panel,read:()=>CampusPostReader.read(),openFull:()=>window.open(chrome.runtime.getURL('dashboard.html')+'?tab='+currentTabId,'_blank','noopener')});
-  window.addEventListener('message',event=>{const url=new URL(chrome.runtime.getURL(''));const allowed=url.origin==='null'?url.protocol+'//'+url.host:url.origin;if(event.source===frame?.contentWindow&&event.origin===allowed&&event.data?.type==='campus-ready'){live.setAdvanced(true);frame.style.display='block';}});
+  window.addEventListener('message',event=>{const url=new URL(chrome.runtime.getURL(''));const allowed=url.origin==='null'?url.protocol+'//'+url.host:url.origin;if(event.source!==frame?.contentWindow||event.origin!==allowed)return;if(event.data?.type==='campus-ready'){live.setAdvanced(true);frame.style.display='block';}else if(event.data?.type==='campus-fallback'){live.setAdvanced(false);frame.style.display='none';}});
 
   async function togglePopup(force,knownTabId){
     const visible=force??panel.hidden;

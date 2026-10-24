@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {prepareSummary} from '../extension/browser-tools.js';
+const updates=[];
+globalThis.Summarizer={availability:async()=> 'unavailable'};
+await assert.rejects(prepareSummary(text=>updates.push(text),{timeoutMs:10}),/unsupported/);
+globalThis.Summarizer={availability:async()=> 'downloadable',create:()=>new Promise(()=>{})};
+await assert.rejects(prepareSummary(text=>updates.push(text),{timeoutMs:10}),/timed out/);
+assert.match(updates.at(-1),/Email reading still works/);
+globalThis.Summarizer={availability:async()=> 'available',create:async()=>({summarize:async()=> 'Ready'})};
+await prepareSummary(text=>updates.push(text),{timeoutMs:50});assert.equal(updates.at(-1),'Browser summaries ready.');
+delete globalThis.Summarizer;
+console.log('Models passed: unsupported devices, setup timeout, retry and success.');
