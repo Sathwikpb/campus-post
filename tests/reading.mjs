@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {analyze,readingText,sentences} from '../src/core.mjs';
+const mail={subject:'Exam registration',received:'2026-10-23T11:25:00+02:00',body:'English version below\nLiebe Studierende,\nBitte melden Sie sich bis zum 1. oder 6. November 2026 an.\nDear students,\nPlease register by November 1 or 6, 2026. The attached timetable gives the deadline for your module. The administrative examination date is 5 February 2027, regardless of when the work is completed.\nYour Examination Office'};
+const data=analyze(mail,new Date('2026-10-24T12:00Z'));
+assert.equal(data.usesExistingEnglish,true);
+assert.equal(data.needsTranslation,false);
+assert.ok(data.summary.every(s=>!s.includes('melden')));
+assert.ok(data.events.every(e=>!e.clear));
+assert.equal(readingText('Liebe Studierende,\nDie Einweisung ist für alle Nutzer verpflichtend. Bitte melden Sie sich an.').needsTranslation,true);
+assert.equal(sentences('Die Prüfung ist am 5. Februar 2027. Bitte anmelden.')[0],'Die Prüfung ist am 5. Februar 2027.');
+assert.equal(analyze({subject:'Welcome',received:mail.received,body:'Please do not respond to this email. Hello everyone.'}).events.length,0);
+console.log('Language selection, date evidence and deadline review tests passed');

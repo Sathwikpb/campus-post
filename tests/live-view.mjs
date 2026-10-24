@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';import {JSDOM} from 'jsdom';import {createLiveView} from '../src/live-view.mjs';
+const dom=new JSDOM('<body><section id="panel"></section></body>',{url:'https://webmail.tu-ilmenau.de/'});globalThis.document=dom.window.document;
+let allowed=true,mail={subject:'Welcome',sender:'office@example.invalid',received:'2026-10-23',body:'Dear students,\nThe meeting is on 28 October 2026 at 17:00 in the Audimax.'};
+globalThis.chrome={storage:{local:{get:async()=>({privacyConsent:allowed?{version:1}:null,settings:{target:'en'}})}}};
+const panel=document.querySelector('#panel'),host=document.createElement('div');document.body.append(host);const shadow=host.attachShadow({mode:'open'});const live=createLiveView({shadow,panel,read:()=>mail,openFull(){}});
+await live.refresh();assert.ok(live.root.textContent.includes('Audimax'));assert.ok(live.root.textContent.includes('28'));assert.ok(live.root.textContent.includes('Welcome'));
+mail={...mail,subject:'German only',body:'Liebe Studierende,\nDie Einweisung ist für alle Nutzer verpflichtend. Bitte melden Sie sich an.'};await live.refresh();assert.ok(live.root.textContent.includes('German-only message'));assert.ok(live.root.textContent.includes('Automatic local translation is unavailable'));
+let release;globalThis.Translator={availability:async()=> 'available',create:async()=>({translate:()=>new Promise(resolve=>release=resolve)})};
+live.setAdvanced(true);live.setAdvanced(false);await new Promise(resolve=>setTimeout(resolve,10));assert.equal(typeof release,'function');
+mail={...mail,subject:'Newer message',body:'Dear students,\nPlease bring a pen to the meeting tomorrow.'};await live.refresh();release('Old translated text');await new Promise(resolve=>setTimeout(resolve,10));assert.ok(live.root.textContent.includes('Newer message'));assert.ok(!live.root.textContent.includes('Old translated text'));
+allowed=false;await live.refresh();assert.ok(!live.root.textContent.includes('Newer message'));assert.ok(live.root.textContent.includes('Enable email tools'));
+live.dispose();dom.window.close();delete globalThis.Translator;
+console.log('Live view passed: local details, German-only fallback, stale-translation protection and consent revocation.');

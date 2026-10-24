@@ -1,0 +1,10 @@
+import {build} from 'esbuild';
+import fs from 'node:fs/promises';
+const pkg=JSON.parse(await fs.readFile('package.json','utf8'));
+const manifest=JSON.parse(await fs.readFile('extension/manifest.json','utf8'));
+if(pkg.version!==manifest.version)throw Error('Package and manifest versions differ');
+await build({entryPoints:['src/core.mjs'],outfile:'extension/core.js',bundle:true,format:'esm',platform:'browser',target:'chrome138',minify:true});
+await build({entryPoints:['src/bridge.mjs'],outfile:'extension/bridge.js',bundle:true,format:'iife',platform:'browser',target:'chrome138',minify:true});
+await fs.copyFile('src/reading.mjs','extension/reading.js');
+await fs.copyFile('docs/INSTALL.md','extension/SETUP.md');
+console.log('Built Campus Post '+pkg.version);

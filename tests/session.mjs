@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {boundedMessages,saveMailSession,restoreMailSession} from '../extension/session-cache.js';
+import {analyze} from '../src/core.mjs';
+import {plainEnglish} from '../extension/email-overview.js';
+import fs from 'node:fs/promises';
+const state={};const area={get:async key=>structuredClone(key===null?state:{[key]:state[key]}),set:async obj=>Object.assign(state,structuredClone(obj)),remove:async key=>{delete state[key];}};
+const mails=[{key:'INBOX:1',body:'First email'},{key:'INBOX:2',body:'Second email'}];
+await saveMailSession(area,7,'account-a',mails,'INBOX:2',123);
+assert.deepEqual((await restoreMailSession(area,7,'account-a')).messages,mails);
+assert.equal((await restoreMailSession(area,7,'account-a')).lastScan,123);
+assert.equal(await restoreMailSession(area,7,'account-b'),null);
+assert.equal(await restoreMailSession(area,8,'account-a'),null);
+assert.equal(boundedMessages(mails,100000,1).length,1);
+assert.equal(boundedMessages([{body:'x'.repeat(1000)},mails[0]],100,500).length,1);
+console.log('Session cache tests passed');

@@ -1,0 +1,65 @@
+{
+  "manifest_version": 3,
+  "name": "Campus Post for TU Ilmenau",
+  "version": "0.3.4",
+  "description": "Read TU webmail with key sentences, registration links, translation tools and calendar drafts. Independent student project.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://webmail.tu-ilmenau.de/*"
+  ],
+  "action": {
+    "default_title": "Show or hide Campus Post",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "dashboard.html",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "dashboard.html",
+        "dashboard.css",
+        "dashboard.js",
+        "browser-tools.js",
+        "core.js",
+        "SETUP.md",
+        "email-overview.js",
+        "reading.js",
+        "session-cache.js"
+      ],
+      "matches": [
+        "https://webmail.tu-ilmenau.de/*"
+      ]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://webmail.tu-ilmenau.de/*"
+      ],
+      "js": [
+        "reader.js",
+        "bridge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "homepage_url": "https://github.com/Sathwikpb/campus-post"
+}

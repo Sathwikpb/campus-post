@@ -1,0 +1,25 @@
+{
+  "name": "campus-post",
+  "version": "0.3.4",
+  "private": true,
+  "type": "module",
+  "description": "Local-first TU Ilmenau webmail assistant",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node tests/core.mjs && node tests/reading.mjs && node tests/overview.mjs && node tests/session.mjs && node tests/live-view.mjs && node tests/release.mjs",
+    "package": "python scripts/package.py"
+  },
+  "dependencies": {
+    "chrono-node": "2.10.3",
+    "htmlparser2": "12.0.0",
+    "postal-mime": "4.1.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "jsdom": "30.1.3"
+  }
+}

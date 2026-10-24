@@ -1,0 +1,12 @@
+import fs from 'node:fs/promises';import assert from 'node:assert/strict';
+import vm from 'node:vm';
+const m=JSON.parse(await fs.readFile('extension/manifest.json','utf8'));
+assert.deepEqual(m.permissions,['storage']);assert.deepEqual(m.host_permissions,['https://webmail.tu-ilmenau.de/*']);
+assert.equal(m.version,JSON.parse(await fs.readFile('package.json','utf8')).version);
+for(const f of [...m.content_scripts[0].js,m.background.service_worker,'dashboard.html','dashboard.js','core.js','SETUP.md',...Object.values(m.icons)])assert.ok((await fs.stat('extension/'+f)).size>0);
+let clicked,listener;const sent=[],opened=[];
+const chrome={action:{onClicked:{addListener:f=>clicked=f}},tabs:{sendMessage:async(...a)=>sent.push(a),create:async a=>opened.push(a)},runtime:{id:'fixture',onMessage:{addListener:f=>listener=f}}};
+vm.runInNewContext(await fs.readFile('extension/background.js','utf8'),{chrome});
+await clicked({id:77,url:'https://webmail.tu-ilmenau.de/?_task=mail'});assert.equal(sent[0][1].type,'campus-popup-toggle');assert.equal(opened.length,0);
+await clicked({id:3,url:'https://example.invalid/'});assert.equal(opened[0].url,'https://webmail.tu-ilmenau.de/');
+console.log('Manifest and popup routing tests passed');

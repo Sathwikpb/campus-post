@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {overviewFacts} from '../extension/email-overview.js';
+const data={summary:['Please register for the meeting.'],eligibility:['Only for graduates.'],events:[]};
+const mail={body:'Please register for the meeting.\nBitte bringe deinen Ausweis mit.\nThe deadline is 30 October.\nUnsubscribe from this mailing list.\nOn Tuesday someone wrote:\nPlease pay an old invoice.'};
+const result=overviewFacts(mail,data);
+assert.deepEqual(result.points,data.summary);assert.deepEqual(result.eligibility,data.eligibility);
+assert.ok(result.actions.includes('Please register for the meeting.'));
+assert.ok(result.actions.includes('Bitte bringe deinen Ausweis mit.'));
+assert.ok(result.actions.includes('The deadline is 30 October.'));
+assert.ok(!result.actions.some(line=>/unsubscribe|old invoice/i.test(line)));
+assert.equal(overviewFacts({body:'Hello!\nHave a nice day.'},{events:[]}).actions.length,0);
+assert.deepEqual(overviewFacts({body:'Please reply.\nPlease reply.'},data).actions,['Please reply.']);
+console.log('Overview facts passed: original action sentences, German requests, deadlines, quoted-history/footer exclusion, duplicate requests and empty messages.');
