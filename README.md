@@ -44,7 +44,7 @@ npm run package
 
 `src/` holds maintainable source for the bundled parser and bridge. `extension/` holds browser UI, reader and build output. `tests/` uses fictional mail and simulated mailbox responses only. `dist/` contains the installable ZIP and checksum. See [architecture](docs/ARCHITECTURE.md).
 
-GitHub Actions tests pushes and pull requests. Pushing a `v*` tag builds a release ZIP, checks that its version matches the tag and publishes a GitHub Release. No store credentials are required. To release: `npm run version -- X.Y.Z`, add a `## X.Y.Z` CHANGELOG section, `npm run build && npm test`, commit, then push tag `vX.Y.Z`. The ZIP is reproducible, so `SHA256SUMS.txt` can be checked against a local `npm run package`.
+GitHub Actions tests pushes and pull requests. When `main` reaches a version with no GitHub Release yet (or a matching `v*` tag is pushed), the Release workflow builds, tests and packages it, then publishes the release and its tag. No store credentials are required. To release: `npm run version -- X.Y.Z`, add a `## X.Y.Z` CHANGELOG section, `npm run build && npm test`, commit and push to `main`. The ZIP is reproducible, so `SHA256SUMS.txt` can be checked against a local `npm run package`.
 
 ## Limits and release status
 

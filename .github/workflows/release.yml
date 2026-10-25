@@ -1,9 +1,18 @@
 name: Release
+# Publishes a GitHub Release when either
+#  - a v* tag is pushed, or
+#  - main receives a commit whose package.json version has no release yet
+#    (so bumping the version with `npm run version` and pushing is enough).
 on:
   push:
+    branches: [main]
     tags: ['v*']
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -15,15 +24,37 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - name: Check tag matches package
-        run: node -e "if ('v'+require('./package.json').version !== process.env.GITHUB_REF_NAME) process.exit(1)"
-      - run: npm ci
-      - run: npm run build
-      - run: npm test
-      - run: git diff --exit-code -- extension
-      - run: npm run package
-      - run: node scripts/release-notes.mjs "$GITHUB_REF_NAME" > dist/RELEASE_NOTES.md
-      - name: Publish release
+      - name: Decide release tag
+        id: tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS.txt --verify-tag --title "Campus Post $GITHUB_REF_NAME" --notes-file dist/RELEASE_NOTES.md
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            [ "$GITHUB_REF_NAME" = "$version" ] || { echo "Tag $GITHUB_REF_NAME does not match package $version"; exit 1; }
+          fi
+          if gh release view "$version" >/dev/null 2>&1; then
+            echo "Release $version already exists; nothing to publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - if: steps.tag.outputs.publish == 'true'
+        run: npm ci
+      - if: steps.tag.outputs.publish == 'true'
+        run: npm run build
+      - if: steps.tag.outputs.publish == 'true'
+        run: npm test
+      - if: steps.tag.outputs.publish == 'true'
+        run: git diff --exit-code -- extension
+      - if: steps.tag.outputs.publish == 'true'
+        run: npm run package
+      - if: steps.tag.outputs.publish == 'true'
+        run: node scripts/release-notes.mjs "${{ steps.tag.outputs.version }}" > dist/RELEASE_NOTES.md
+      - name: Publish release
+        if: steps.tag.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: gh release create "$VERSION" dist/*.zip dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Campus Post $VERSION" --notes-file dist/RELEASE_NOTES.md
