@@ -30,10 +30,16 @@ export function createLiveView({shadow,panel,read,openFull}){
   if(translation){const d=el('details');d.open=true;d.append(el('summary','Full local translation'),el('pre',translation));root.append(d);}
   const original=el('details');original.append(el('summary','Read original email'),el('pre',mail.body));root.append(original,el('p','Local extraction can miss context. Check important details against the source.','cp-note'));
  }
+ // Consent and settings are cached and invalidated by storage events, so the
+ // half-second follower does not hit extension storage on every tick.
+ let cachedPrefs=null;
+ const onStorage=(changes,area)=>{if(area==='local'&&(changes.privacyConsent||changes.settings)){cachedPrefs=null;current='';}};
+ const events=globalThis.chrome?.storage?.onChanged;events?.addListener(onStorage);
+ async function preferences(){if(cachedPrefs&&events)return cachedPrefs;const value=await chrome.storage.local.get(['privacyConsent','settings']);if(events)cachedPrefs=value;return value;}
  async function refresh(){
-  if(panel.hidden||advanced||checking)return;checking=true;
+  if(panel.hidden||advanced||checking||document.visibilityState==='hidden')return;checking=true;
   try{
-   const stored=await chrome.storage.local.get(['privacyConsent','settings']);
+   const stored=await preferences();
    if(stored.privacyConsent?.version!==1){root.replaceChildren(el('h2','Enable email tools'),el('p','Campus Post reads the open email locally, extracts key details and links, and can use browser-managed on-device translation. It does not send your email to a translation website automatically.'),el('p','Raw source stays in memory; recent decoded emails in the full assistant use temporary session memory. Settings and saved agenda entries stay in this browser profile.'),action('I agree — enable email tools',async()=>{await chrome.storage.local.set({privacyConsent:{version:1,acceptedAt:new Date().toISOString()}});current='';}));return;}
    target=stored.settings?.target||'en';auto=stored.settings?.autoTranslate!==false;
    const mail=read();if(!mail){if(current!=='none'){current='none';generation++;root.replaceChildren(el('h2','Open an email in webmail'),el('p','Its details will appear here. No inbox scan is needed.','cp-note'));}return;}
@@ -50,5 +56,5 @@ export function createLiveView({shadow,panel,read,openFull}){
  }
  root.append(el('p','Loading the selected email…','cp-note'));
  const timer=setInterval(()=>{refresh().catch(()=>{});},500);
- return {root,refresh,setAdvanced(value){advanced=value;root.hidden=value;if(!value){current='';refresh().catch(()=>{});}},dispose(){clearInterval(timer);}};
+ return {root,refresh,setAdvanced(value){advanced=value;root.hidden=value;if(!value){current='';refresh().catch(()=>{});}},dispose(){clearInterval(timer);events?.removeListener(onStorage);}};
 }

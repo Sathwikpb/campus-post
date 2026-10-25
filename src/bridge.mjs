@@ -4,6 +4,11 @@ import {createLiveView} from './live-view.mjs';
   // Parse data literals only. Roundcube's returned JavaScript is never executed.
   function argsAt(text,at){let depth=1,quoted=false,escape=false;for(let i=at;i<text.length;i++){const c=text[i];if(quoted){if(escape)escape=false;else if(c==='\\')escape=true;else if(c==='"')quoted=false;}else if(c==='"')quoted=true;else if(c==='(')depth++;else if(c===')'&&!--depth)return JSON.parse('['+text.slice(at,i)+']');}throw Error('Unrecognized webmail response.');}
   function config(doc=document){const env={};for(const script of doc.scripts){const text=script.textContent||'';let start=0;while((start=text.indexOf('rcmail.set_env(',start))>=0){start+='rcmail.set_env('.length;try{Object.assign(env,argsAt(text,start)[0]);}catch{} }}return env;}
+  let consent=null;
+  // Cached because the popup follows the open email several times a second;
+  // any consent change or full reset invalidates it through storage events.
+  const storageEvents=chrome.storage.onChanged;storageEvents?.addListener((changes,area)=>{if(area==='local'&&'privacyConsent' in changes)consent=null;});
+  async function consented(){if(consent!==null)return consent;const value=(await chrome.storage.local.get('privacyConsent')).privacyConsent?.version===1;if(storageEvents)consent=value;return value;}
   let cachedIdentity='';
   function context(){const env=config();if(document.querySelector('input[type=password]')||env.task==='login'){cachedIdentity='';throw Error('Sign into TU webmail first, then refresh the webmail tab.');}
     let identity=env.username||'';
@@ -59,7 +64,7 @@ import {createLiveView} from './live-view.mjs';
     if(sender.id!==chrome.runtime.id||!sender.url?.startsWith(chrome.runtime.getURL('dashboard.html')))return;
     const handlers={context:()=>{const c=context();let openRef=null;for(const doc of docs()){const e=config(doc);if(e.uid)openRef={uid:String(e.uid),folder:String(e.mailbox||c.folder)};}return {account:c.account,folder:c.folder,open:CampusPostReader.read(),openRef};},list:()=>list(message.page,message.account),raw:()=>rawMail(message.uid,message.account,message.folder),snapshot:()=>{safeContext(message.account);return snapshot();},apply:()=>{safeContext(message.account);return apply(message.id,message.values);},restore:()=>restore()};
     if(!handlers[message.type])return;
-    Promise.resolve().then(async()=>{const stored=await chrome.storage.local.get('privacyConsent');if(stored.privacyConsent?.version!==1)throw Error('Enable email tools in Campus Post before accessing webmail.');return handlers[message.type]();}).then(data=>respond({ok:true,...data}),error=>respond({ok:false,error:error.message}));return true;
+    Promise.resolve().then(async()=>{if(!await consented())throw Error('Enable email tools in Campus Post before accessing webmail.');return handlers[message.type]();}).then(data=>respond({ok:true,...data}),error=>respond({ok:false,error:error.message}));return true;
   });
   const host=document.createElement('div');host.id='campus-post-open';host.style.cssText='position:fixed;right:18px;bottom:18px;z-index:2147483000';
   const shadow=host.attachShadow({mode:'open'}),button=document.createElement('button');button.textContent='✉ Campus Post';button.style.cssText='font:600 14px system-ui;padding:13px 19px;border:0;border-radius:24px;background:#235e48;color:white;box-shadow:0 4px 20px #0003;cursor:pointer';button.setAttribute('aria-expanded','false');
@@ -72,7 +77,7 @@ import {createLiveView} from './live-view.mjs';
   const live=createLiveView({shadow,panel,read:()=>CampusPostReader.read(),openFull:()=>window.open(chrome.runtime.getURL('dashboard.html')+'?tab='+currentTabId,'_blank','noopener')});
   window.addEventListener('message',event=>{const url=new URL(chrome.runtime.getURL(''));const allowed=url.origin==='null'?url.protocol+'//'+url.host:url.origin;if(event.source!==frame?.contentWindow||event.origin!==allowed)return;if(event.data?.type==='campus-ready'){live.setAdvanced(true);frame.style.display='block';}else if(event.data?.type==='campus-fallback'){live.setAdvanced(false);frame.style.display='none';}});
 
-  async function togglePopup(force,knownTabId){
+  async function togglePopup(force,knownTabId,remember=true){
     const visible=force??panel.hidden;
     if(visible&&!frame){
       const data=knownTabId?{ok:true,tabId:knownTabId}:await chrome.runtime.sendMessage({type:'campus-context'});
@@ -80,9 +85,11 @@ import {createLiveView} from './live-view.mjs';
       currentTabId=data.tabId;frame=document.createElement('iframe');frame.title='Campus Post assistant';frame.src=chrome.runtime.getURL('dashboard.html')+'?tab='+data.tabId+'&popup=1';frame.allow='translator; summarizer; language-detector';frame.style.cssText='display:none;width:100%;flex:1;min-height:0;border:0;background:#fafcf7';frame.addEventListener('load',()=>frame.contentWindow?.postMessage({type:'campus-visibility',visible:!panel.hidden},'*'));panel.append(frame);new MutationObserver(()=>{if(frame.hasAttribute('srcdoc')){frame.style.display='none';live.setAdvanced(false);}}).observe(frame,{attributes:true,attributeFilter:['srcdoc']});
     }
     panel.hidden=!visible;panel.style.display=visible?'flex':'none';button.setAttribute('aria-expanded',String(visible));if(visible)live.refresh().catch(()=>{});
+    // Respect a closed panel on the next page load instead of reopening it every time.
+    if(remember)chrome.storage.local.set({popupClosed:!visible}).catch(()=>{});
     // This message contains no email data; the child accepts only its TU parent.
     frame?.contentWindow?.postMessage({type:'campus-visibility',visible},'*');
   }
   panel.style.display='none';button.onclick=()=>togglePopup();close.onclick=()=>togglePopup(false);shadow.append(panel,button);document.documentElement.append(host);
-  if(new URL(location.href).searchParams.get('_task')==='mail'||document.querySelector('#messagelist,#messagebody'))togglePopup(true).catch(()=>{});
+  if(new URL(location.href).searchParams.get('_task')==='mail'||document.querySelector('#messagelist,#messagebody'))chrome.storage.local.get('popupClosed').then(saved=>saved.popupClosed?undefined:togglePopup(true,undefined,false)).catch(()=>{});
 })();

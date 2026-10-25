@@ -12,12 +12,13 @@ An independent, open-source browser extension that makes TU Ilmenau webmail easi
 - Optional browser-managed local translation for German-only emails; language availability depends on the browser and device, and the first download may need a click.
 - Optional inbox scan and browser-local agenda. Creates Google Calendar drafts or .ics downloads for you to review and save.
 - Local fallback view when the full embedded assistant cannot load.
+- Toggle the panel with the toolbar icon, the floating button or **Alt+Shift+M**; a closed panel stays closed on the next page load.
 
 No paid API, AI account or developer account is required. Core extraction works without AI. **Optional translation and browser summaries use on-device machine-learning models**; they are not dictionary-only translation. Google Translate is a manual fallback that sends the selected text to Google after you choose it.
 
 ## Install
 
-1. Download `campus-post-0.3.5.zip` from Releases and extract it into a permanent folder.
+1. Download `campus-post-0.3.6.zip` from Releases and extract it into a permanent folder.
 2. Open your browser's Extensions page (`chrome://extensions` or `brave://extensions`), enable Developer mode, and choose **Load unpacked**.
 3. Select the extracted folder containing `manifest.json`.
 4. Refresh [TU webmail](https://webmail.tu-ilmenau.de/), sign in there and enable Campus Post's email tools after reading its disclosure.
@@ -43,7 +44,7 @@ npm run package
 
 `src/` holds maintainable source for the bundled parser and bridge. `extension/` holds browser UI, reader and build output. `tests/` uses fictional mail and simulated mailbox responses only. `dist/` contains the installable ZIP and checksum. See [architecture](docs/ARCHITECTURE.md).
 
-GitHub Actions tests pushes and pull requests. Pushing a `v*` tag builds a release ZIP, checks that its version matches the tag and publishes a GitHub Release. No store credentials are required. Maintainers should increment package/manifest/UI versions, rebuild and commit bundles before tagging.
+GitHub Actions tests pushes and pull requests. Pushing a `v*` tag builds a release ZIP, checks that its version matches the tag and publishes a GitHub Release. No store credentials are required. To release: `npm run version -- X.Y.Z`, add a `## X.Y.Z` CHANGELOG section, `npm run build && npm test`, commit, then push tag `vX.Y.Z`. The ZIP is reproducible, so `SHA256SUMS.txt` can be checked against a local `npm run package`.
 
 ## Limits and release status
 

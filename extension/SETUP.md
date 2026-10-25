@@ -1,4 +1,4 @@
-# Install and update Campus Post 0.3.5
+# Install and update Campus Post 0.3.6
 
 ## New users
 
@@ -24,4 +24,4 @@ Get updates opens the GitHub releases page. It does not install anything. Chrome
 
 ## Troubleshooting
 
-After updating, reload the extension and refresh webmail. Open one email; use the toolbar icon if the floating button is hidden. The local live view works when the full assistant frame fails; Inbox & agenda opens the full workspace. Unsupported mailbox layouts can still fail. Never post private mailbox contents or authentication details in a bug report.
+After updating, reload the extension and refresh webmail. Open one email; use the toolbar icon, the floating button or Alt+Shift+M to show the panel (a panel you closed stays closed until you open it again). Change the shortcut at chrome://extensions/shortcuts. The local live view works when the full assistant frame fails; Inbox & agenda opens the full workspace. Unsupported mailbox layouts can still fail. Never post private mailbox contents or authentication details in a bug report.

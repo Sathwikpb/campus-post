@@ -9,5 +9,13 @@ let release;globalThis.Translator={availability:async()=> 'available',create:asy
 live.setAdvanced(true);live.setAdvanced(false);await new Promise(resolve=>setTimeout(resolve,10));assert.equal(typeof release,'function');
 mail={...mail,subject:'Newer message',body:'Dear students,\nPlease bring a pen to the meeting tomorrow.'};await live.refresh();release('Old translated text');await new Promise(resolve=>setTimeout(resolve,10));assert.ok(live.root.textContent.includes('Newer message'));assert.ok(!live.root.textContent.includes('Old translated text'));
 allowed=false;await live.refresh();assert.ok(!live.root.textContent.includes('Newer message'));assert.ok(live.root.textContent.includes('Enable email tools'));
-live.dispose();dom.window.close();delete globalThis.Translator;
-console.log('Live view passed: local details, German-only fallback, stale-translation protection and consent revocation.');
+live.dispose();delete globalThis.Translator;
+// With storage events available, consent/settings are read once and refreshed only on change.
+let reads=0,changed;globalThis.chrome={storage:{onChanged:{addListener:f=>changed=f,removeListener(){}},local:{get:async()=>{reads++;return {privacyConsent:{version:1},settings:{target:'en'}};}}}};
+const cachedPanel=document.createElement('section');const cachedHost=document.createElement('div');document.body.append(cachedHost);
+const cached=createLiveView({shadow:cachedHost.attachShadow({mode:'open'}),panel:cachedPanel,read:()=>mail,openFull(){}});
+await cached.refresh();await cached.refresh();await cached.refresh();assert.equal(reads,1,'storage read once while unchanged');
+changed({settings:{newValue:{target:'de'}}},'local');await cached.refresh();assert.equal(reads,2,'settings change invalidates the cache');
+Object.defineProperty(document,'visibilityState',{value:'hidden',configurable:true});mail={...mail,subject:'Hidden tab mail'};await cached.refresh();assert.ok(!cached.root.textContent.includes('Hidden tab mail'),'no work while the tab is hidden');
+cached.dispose();dom.window.close();
+console.log('Live view passed: local details, German-only fallback, stale-translation protection, consent revocation, storage caching and hidden-tab pause.');
