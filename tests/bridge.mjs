@@ -23,6 +23,9 @@ assert.equal((await first.send({type:'restore'})).ok,true);assert.equal((await f
 assert.equal(first.gets.filter(k=>k==='privacyConsent').length-before,1,'consent cached between mailbox requests');
 await first.w.chrome.storage.local.set({privacyConsent:null});
 const revoked=await first.send({type:'restore'});assert.equal(revoked.ok,false,'revoked consent is honoured immediately');assert.match(revoked.error,/Enable email tools/);
+// A detached assistant frame must not leave a blank panel.
+const live=first.shadow.querySelector('.cp-live');first.shadow.querySelector('iframe').remove();await wait();
+assert.equal(live.hidden,false,'live view returns when the frame is removed');
 first.dom.window.close();
 const second=await page({popupClosed:true});
 assert.equal(second.panel.hidden,true,'a closed panel stays closed on the next page load');

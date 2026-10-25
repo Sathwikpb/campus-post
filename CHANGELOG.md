@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.7 — 2026-10-26
+
+- Fix a blank panel when the full assistant frame is removed from the page by other software (seen with browser-automation extensions): Campus Post now falls back to the local live view and rebuilds the frame the next time the panel opens.
+
 ## 0.3.6 — 2026-10-26
 
 - Remember when the floating panel is closed instead of reopening it on every webmail page load.

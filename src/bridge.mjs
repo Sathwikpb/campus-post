@@ -77,12 +77,16 @@ import {createLiveView} from './live-view.mjs';
   const live=createLiveView({shadow,panel,read:()=>CampusPostReader.read(),openFull:()=>window.open(chrome.runtime.getURL('dashboard.html')+'?tab='+currentTabId,'_blank','noopener')});
   window.addEventListener('message',event=>{const url=new URL(chrome.runtime.getURL(''));const allowed=url.origin==='null'?url.protocol+'//'+url.host:url.origin;if(event.source!==frame?.contentWindow||event.origin!==allowed)return;if(event.data?.type==='campus-ready'){live.setAdvanced(true);frame.style.display='block';}else if(event.data?.type==='campus-fallback'){live.setAdvanced(false);frame.style.display='none';}});
 
+  // Other software (another extension, automation tools or page scripts) can
+  // detach the assistant frame. Never leave an empty panel: fall back to the
+  // local live view and rebuild the frame the next time the panel opens.
+  new MutationObserver(()=>{if(frame&&!frame.isConnected){frame=null;live.setAdvanced(false);}}).observe(panel,{childList:true});
   async function togglePopup(force,knownTabId,remember=true){
     const visible=force??panel.hidden;
     if(visible&&!frame){
       const data=knownTabId?{ok:true,tabId:knownTabId}:await chrome.runtime.sendMessage({type:'campus-context'});
       if(!data?.ok||!data.tabId)return;
-      currentTabId=data.tabId;frame=document.createElement('iframe');frame.title='Campus Post assistant';frame.src=chrome.runtime.getURL('dashboard.html')+'?tab='+data.tabId+'&popup=1';frame.allow='translator; summarizer; language-detector';frame.style.cssText='display:none;width:100%;flex:1;min-height:0;border:0;background:#fafcf7';frame.addEventListener('load',()=>frame.contentWindow?.postMessage({type:'campus-visibility',visible:!panel.hidden},'*'));panel.append(frame);new MutationObserver(()=>{if(frame.hasAttribute('srcdoc')){frame.style.display='none';live.setAdvanced(false);}}).observe(frame,{attributes:true,attributeFilter:['srcdoc']});
+      currentTabId=data.tabId;frame=document.createElement('iframe');frame.title='Campus Post assistant';frame.src=chrome.runtime.getURL('dashboard.html')+'?tab='+data.tabId+'&popup=1';frame.allow='translator; summarizer; language-detector';frame.style.cssText='display:none;width:100%;flex:1;min-height:0;border:0;background:#fafcf7';frame.addEventListener('load',()=>frame.contentWindow?.postMessage({type:'campus-visibility',visible:!panel.hidden},'*'));panel.append(frame);new MutationObserver(()=>{if(frame?.hasAttribute('srcdoc')){frame.style.display='none';live.setAdvanced(false);}}).observe(frame,{attributes:true,attributeFilter:['srcdoc']});
     }
     panel.hidden=!visible;panel.style.display=visible?'flex':'none';button.setAttribute('aria-expanded',String(visible));if(visible)live.refresh().catch(()=>{});
     // Respect a closed panel on the next page load instead of reopening it every time.
