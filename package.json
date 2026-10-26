@@ -1,6 +1,6 @@
 {
   "name": "campus-post",
-  "version": "0.3.7",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Local-first TU Ilmenau webmail assistant",
@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node tests/core.mjs && node tests/reading.mjs && node tests/overview.mjs && node tests/session.mjs && node tests/live-view.mjs && node tests/release.mjs && node tests/startup.mjs && node tests/models.mjs && node tests/bridge.mjs",
+    "test": "node tests/core.mjs && node tests/reading.mjs && node tests/overview.mjs && node tests/session.mjs && node tests/live-view.mjs && node tests/release.mjs && node tests/startup.mjs && node tests/models.mjs && node tests/bridge.mjs && node tests/realworld.mjs",
     "package": "python scripts/package.py",
     "version": "node scripts/version.mjs"
   },

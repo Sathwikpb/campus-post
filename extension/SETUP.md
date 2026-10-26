@@ -1,4 +1,4 @@
-# Install and update Campus Post 0.3.7
+# Install and update Campus Post 0.4.0
 
 ## New users
 

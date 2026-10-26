@@ -17,5 +17,6 @@ export function overviewFacts(mail,data){
  const lines=sentences(data.readingBody??currentText(mail.body||''));
  const action=/\b(?:please|must|register|registration|book|booking|submit|reply|respond|confirm|attend|bring|complete|apply|upload|pay|deadline|deregister|cancel|bitte|anmelden|anmeldung|abmelden|abmeldung|buchen|einreichen|abgeben|antworten|bestätigen|mitbringen|bewerben|hochladen|bezahlen|frist)\b|müssen|spätestens/i;
  const footer=/unsubscribe|mailing list|verteiler|leave@|no-reply|do not reply|nicht antworten/i;
- return {actions:data.needsTranslation?[]:[...new Set(lines.filter(line=>action.test(line)&&!footer.test(line)))],points:data.summary||[],eligibility:data.eligibility||[],dates:data.events||[]};
+ const tidy=line=>line.replace(/\s*<https?:[^>\s]+>/g,'').replace(/\s*\[(?:https?:|cid:)[^\]\s]+\]/g,'').replace(/^\p{Ll}/u,c=>c.toUpperCase()).trim();
+ return {actions:data.needsTranslation?[]:[...new Set(lines.filter(line=>action.test(line)&&!footer.test(line)&&!/manage your (?:email )?preferences|click here to/i.test(line)).map(tidy))],points:data.summary||[],eligibility:data.eligibility||[],dates:data.events||[]};
 }

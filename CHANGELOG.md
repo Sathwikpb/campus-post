@@ -1,8 +1,31 @@
 # Changelog
 
-## 0.3.7 — 2026-10-26
+## 0.4.0 — 2026-10-26
 
-- Fix a blank panel when the full assistant frame is removed from the page by other software (seen with browser-automation extensions): Campus Post now falls back to the local live view and rebuilds the frame the next time the panel opens.
+Checked against a full real TU mailbox (531 messages, June–October 2026): no crashes, ~1 ms per message. Fixes come from that run and are covered by fictional regression tests.
+
+**Dates and times**
+- Dotted clock times (`17.00 Uhr`, `um 9.30`, `6.30 - 8 p.m.`) are no longer read as dates; previously "Am 02.11 um 17.00 Uhr" became 20:26.
+- Decimal numbers and version strings (`1.5 hours`, `605.1.15`) no longer create events.
+- `Samstag, 5.9., 14-18 Uhr` and other day.month. dates followed by a comma are recognised, with German hour ranges (`14-18 Uhr`).
+- English ranges with a shared a.m./p.m. (`4 - 5.30 p.m.`) get start and end times.
+- German day ranges (`14.-21.04.2028`, `22. - 24.09.2026`) keep their start day.
+- German weekdays in parentheses (`07.07.2026 (Dienstag)`) no longer create a second, wrong date; German weekday/date contradictions are flagged.
+- Dates before the email was sent are marked as historical references, not appointments.
+- A date-only mention of a day that also has a timed mention is merged into one event.
+- Forum post timestamps (Moodle) are ignored; dates more than ~18 months away without a written year are dropped as misreadings.
+
+**Language selection**
+- English sections are found by splitting the email at rulers, decorated markers (`***German Version***`, `_____ English version below _____`) and greetings, then scoring each section, instead of relying on one marker format.
+- German greetings copied above the English text are removed.
+- Forwarded posts made entirely of `>` quoted lines are read instead of showing as empty.
+
+**Key points**
+- Greeting tails (`staff, and students,`), lone times, unsubscribe footers and bracketed URLs are no longer shown as key points; sentences that continued after a greeting are capitalised; `word.Next` without a space is split.
+
+**Live view (TU Elastic skin)**
+- Reads the sent date and sender from Elastic's `#message-header` (previously every live-view email showed "Original email date is missing" and "University email"), including German (`16.10.2026 14:58`) and relative (`Heute 09:15`) dates.
+- Fix a blank panel when the full assistant frame is removed from the page by other software (seen with browser-automation extensions): Campus Post falls back to the live view and rebuilds the frame next time the panel opens.
 
 ## 0.3.6 — 2026-10-26
 

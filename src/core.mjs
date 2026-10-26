@@ -41,7 +41,24 @@ export function splitText(text,max=3500) {
   return parts;
 }
 function pad(n){return String(n).padStart(2,'0');}
+const POST_STAMP=/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag),\s+\d{1,2}\.?\s+\p{L}+\s+\d{4},\s+\d{1,2}:\d{2}(?:\s*[AP]M)?$/iu;
+function validDayMonth(d,m){return Number(d)>=1&&Number(d)<=31&&Number(m)>=1&&Number(m)<=12;}
+// "17.00 Uhr", "um 9.30", "6.30 - 8 p.m." are clock times, not dates.
+export function normalizeTimes(text){
+ const clock=(h,m)=>Number(h)<24&&Number(m)<60;
+ return text
+  .replace(/\b(\d{1,2})\.(\d{2})(?=\s*(?:Uhr|h\b|[ap]\.?m\.?|o'clock))/gi,(all,h,m)=>clock(h,m)?h+':'+m:all)
+  .replace(/\b(at|um|ab|bis|von|from|to|until|starting)\s+(\d{1,2})\.(\d{2})\b/gi,(all,w,h,m)=>clock(h,m)?w+' '+h+':'+m:all)
+  .replace(/\b(\d{1,2})\.(\d{2})(\s*[-–]\s*\d{1,2}(?:[:.]\d{2})?\s*(?:Uhr|h\b|[ap]\.?m\.?))/gi,(all,h,m,rest)=>clock(h,m)?h+':'+m+rest.replace(/(\d)\.(\d{2})/,'$1:$2'):all)
+  .replace(/(?<![\d.:])(\d{1,2})(?::(\d{2}))?\s*[-–]\s*(\d{1,2})(?::(\d{2}))?\s*Uhr\b/gi,(all,h,m,h2,m2)=>clock(h,m||0)&&clock(h2,m2||0)&&Number(h)<Number(h2)?'von '+h+':'+(m||'00')+' bis '+h2+':'+(m2||'00')+' Uhr':all)
+  .replace(/\b(\d{1,2})(?:[:.](\d{2}))?\s*[-–]\s*(\d{1,2})(?:[:.](\d{2}))?\s*([ap])\.?m\.?/gi,(all,h,m,h2,m2,p)=>Number(h)<Number(h2)&&Number(h2)<12&&clock(h,m||0)&&clock(h2,m2||0)?'from '+h+':'+(m||'00')+' '+p+'m to '+h2+':'+(m2||'00')+' '+p+'m':all);
+}
 function component(c){const date=`${c.get('year')}-${pad(c.get('month'))}-${pad(c.get('day'))}`;return {date,time:c.isCertain('hour')?`${pad(c.get('hour'))}:${pad(c.get('minute')||0)}`:''};}
+// Display clean-up for extracted sentences: drop bracketed URLs and
+// capitalise a sentence that continued after a greeting line.
+export function tidy(text){return text.replace(/\s*<https?:[^>\s]+>/g,'').replace(/\s*\[(?:https?:|cid:)[^\]\s]+\]/g,'').replace(/\.\.(?=\s|$)/g,'.').replace(/^\p{Ll}/u,c=>c.toUpperCase()).trim();}
+// Greeting tails ("staff, and students,"), lone times and footers are not key points.
+function fragment(text){return POST_STAMP.test(text)||text.length<45&&/,$/.test(text)||/^(?:from|ab|at|um|on|am)?\s*\d{1,2}(?::\d{2})?\s*(?:[ap]m|Uhr)?$/i.test(text)||/unsubscribe|manage your (?:email )?preferences|abmelden vom|newsletter abbestellen/i.test(text)||text.replace(/https?:\S+/g,'').trim().length<12;}
 export function analyze(mail,now=new Date(),target='en') {
   const hasReceived=Number.isFinite(Date.parse(mail.received));
   const actualReference=hasReceived?new Date(mail.received):new Date(now);
@@ -53,7 +70,7 @@ export function analyze(mail,now=new Date(),target='en') {
   const lines=sentences(reading.text).map(line=>line.replace(/^(?:Dear\s+(?:students|colleagues|all|participants)|Hello\s+everyone|Hi\s+all)[,!]\s*/i,'')).filter(Boolean);
   const dateEvidence=/\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|today|tomorrow|yesterday|heute|morgen|gestern|Jan(?:uary|uar)?|Feb(?:ruary|ruar)?|March|März|April|May|Mai|June|Juni|July|Juli|August|Sept?(?:ember)?|Oct(?:ober)?|Okt(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|Dez(?:ember)?)\b|\b\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?\b|\b20\d{2}-\d{2}-\d{2}\b/i;
   const scored=lines.filter(s=>! /^(?:liebe |hallo |dear |hello |hi |[-= ]*(?:English|German) version|\[English\]|mit freundlichen|best regards|best wishes|kind regards|copyright|all other registered|this email message|\*+ Please do not respond|User Count:|Type:|Usage:|\[private|[_-]{4})/i.test(s)).map((text,i)=>({text,i,score:(/Step\s+\d/i.test(text)?10:0)+(/frist|deadline|prüfung|exam|abgabe|submit|anmeldung|register|cancel|fällt aus|verschoben|spätestens|must|müssen|need to|verpflichtend|einweisung|Step \d|activate|install/i.test(text)?4:0)+(dateEvidence.test(text)?3:0)+(/bitte|please|raum|room|Audimax|EAZ/i.test(text)?2:0)}));
-  const summary=scored.sort((a,b)=>b.score-a.score||a.i-b.i).slice(0,4).sort((a,b)=>a.i-b.i).map(s=>s.text);
+  const summary=scored.filter(s=>!fragment(s.text)).sort((a,b)=>b.score-a.score||a.i-b.i).slice(0,4).sort((a,b)=>a.i-b.i).map(s=>tidy(s.text));
   const events=[],seen=new Set();
   const schedulePattern=/jeden|jede woche|wöchentlich|weekly|every (?:week|day|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Montag|Dienstag|Mittwoch|Donnerstag|Freitag)\s*&\s*/i;
   const schedules=lines.filter(line=>schedulePattern.test(line));
@@ -62,12 +79,16 @@ export function analyze(mail,now=new Date(),target='en') {
   const attachedSchedule=/attach(?:ed|ment)|beigefügt/i.test(reading.text)&&/registration|withdrawal|anmelde|rücktritt/i.test(reading.text);
   for(const source of [...lines,...(hasAlternatives?sentences(alternativeDates):[]),mail.subject]){
   const lineReference=new Date(reference);if(subjectYear&&!/tomorrow|today|morgen|heute|nächste|next\s/i.test(source))lineReference.setFullYear(Number(subjectYear));
-  const normalized=source.replace(/\((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\)/gi,'').replace(/\bat (\d{1,2})\.(\d{2})\b/gi,'at $1:$2').replace(/\b(\d{1,2})\.(\d{1,2})(?:\.(?!\d)|(?=\s|$))/g,(_,d,m)=>`${d}.${m}.${lineReference.getFullYear()}`).replace(/zwischen\s+(\d{1,2})(?::(\d{2}))?\s+und\s*(\d{1,2})(?::(\d{2}))?/gi,(_,a,b,c,d)=>`von ${a}:${b||'00'} bis ${c}:${d||'00'}`).replace(/between\s+(\d{1,2})(?::(\d{2}))?\s+and\s*(\d{1,2})(?::(\d{2}))?/gi,(_,a,b,c,d)=>`from ${a}:${b||'00'} to ${c}:${d||'00'}`);
+  const normalized=normalizeTimes(source).replace(/\((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Mon?|Tue?|Wed|Thu|Fri|Sat|Sun|Di|Mi|Do|Fr|Sa|So)\.?\)/gi,'').replace(/(?<![\d.,])(\d{1,2})\.(\d{1,2})(\.)?(?!\d|,\d|\.\d)/g,(all,d,m,dot)=>validDayMonth(d,m)&&(dot||m.length===2)?`${d}.${m}.${lineReference.getFullYear()}`:all).replace(/zwischen\s+(\d{1,2})(?::(\d{2}))?\s+und\s*(\d{1,2})(?::(\d{2}))?/gi,(_,a,b,c,d)=>`von ${a}:${b||'00'} bis ${c}:${d||'00'}`).replace(/between\s+(\d{1,2})(?::(\d{2}))?\s+and\s*(\d{1,2})(?::(\d{2}))?/gi,(_,a,b,c,d)=>`from ${a}:${b||'00'} to ${c}:${d||'00'}`);
   if(!dateEvidence.test(source))continue;
+  // A bare post timestamp ("Wednesday, 14 October 2026, 4:35 PM") is metadata.
+  if(POST_STAMP.test(source.trim()))continue;
   if(schedulePattern.test(source)&&!/[0-9]{1,2}[./][0-9]{1,2}|(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d|\d\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)/i.test(source))continue;
-  const european=normalized.replace(/\b(\d{1,2})[./](\d{1,2})[./](20\d{2})\b/g,(_,day,month,year)=>year+'-'+month.padStart(2,'0')+'-'+day.padStart(2,'0'));
+  // "14.-21.04.2028" is a day range within one month.
+  const expanded=normalized.replace(/(?<![\d.])(\d{1,2})\.\s*[-–]\s*(\d{1,2})\.(\d{1,2})\.(20\d{2})\b/g,(all,d1,d2,m,y)=>validDayMonth(d1,m)&&validDayMonth(d2,m)&&Number(d1)<Number(d2)?`${d1}.${m}.${y} bis ${d2}.${m}.${y}`:all);
+  const european=expanded.replace(/(?<![\d.])(\d{1,2})[./](\d{1,2})[./](20\d{2})\b/g,(_,day,month,year)=>year+'-'+month.padStart(2,'0')+'-'+day.padStart(2,'0'));
   const englishLine=/\b(?:January|February|March|April|May|June|July|August|September|October|November|December|the|will|from|between|tomorrow|today|yesterday|meeting|at)\b/i.test(source);
-  const parsed=(englishLine||reading.language==='en'?en.parse(european,lineReference):de.parse(european,lineReference)).sort((a,b)=>a.index-b.index||b.text.length-a.text.length),occupied=[];
+  const parsed=(englishLine||reading.language==='en'?en.parse(european,lineReference):de.parse(expanded,lineReference)).sort((a,b)=>a.index-b.index||b.text.length-a.text.length),occupied=[];
   for(const r of parsed){
     if(!dateEvidence.test(r.text))continue;
     // Relative offsets need their referenced exam, not the email's sent date.
@@ -76,8 +97,10 @@ export function analyze(mail,now=new Date(),target='en') {
     if(/before|vorher|zuvor/i.test(source)&&/^(?:\d+|one|two|three|four|five|six|seven|vier)\s+(?:days?|tage?)/i.test(r.text))continue;
     if(occupied.some(([a,b])=>r.index<b&&r.index+r.text.length>a))continue;
     occupied.push([r.index,r.index+r.text.length]);
-    const start=component(r.start);let end=r.end?component(r.end):null;const clocks=sourceClocks(source);if(!start.time&&clocks?.start)start.time=clocks.start;if(clocks?.end){if(!end)end={date:start.date,time:clocks.end};else if(end.date===start.date&&!end.time)end.time=clocks.end;}
+    const start=component(r.start);let end=r.end?component(r.end):null;const clocks=sourceClocks(normalized);if(!start.time&&clocks?.start)start.time=clocks.start;if(clocks?.end){if(!end)end={date:start.date,time:clocks.end};else if(end.date===start.date&&!end.time)end.time=clocks.end;}
     if(!r.start.isCertain('day')&&!r.start.isCertain('weekday')&&!/heute|morgen|today|tomorrow/i.test(r.text))continue;
+    // Without a written year, a date more than ~18 months away is a misreading.
+    if(!/\b20\d{2}\b/.test(source)&&Math.abs(new Date(start.date+'T12:00:00Z')-lineReference)>550*864e5)continue;
     const cancelled=/fällt\s+aus|abgesagt|cancelled|canceled|verschoben|rescheduled|nicht statt/i.test(mail.subject+' '+source);
     const explicit=(/\b20\d{2}\b/.test(source)||!!subjectYear)&&r.start.isCertain('month')&&r.start.isCertain('day')&&!/tomorrow|today|morgen|heute|nächste|next\s/i.test(r.text);
     const timezoneAmbiguous=/\b(?:UTC|GMT|CEST|CET|EST|EDT|PST|PDT|MEZ|MESZ)\b|[+-]\d{2}:?\d{2}/i.test(source.replace(/\d{4}-\d{2}-\d{2}/g,''));
@@ -85,19 +108,24 @@ export function analyze(mail,now=new Date(),target='en') {
     const key=start.date+'T'+start.time;if(seen.has(key))continue;if(!start.time&&events.some(e=>e.startDate===start.date))continue;seen.add(key);
     const ambiguousTime=/\bat\s+(?:[1-9]|1[0-2])[:.]\d{2}\b/i.test(source)&&! /\b(?:[ap]m\b|[ap]\.m\.)/i.test(source);
     const bookingWindow=/between|zwischen/i.test(source)&&/book an appointment|registration|beratungsslot|anmelden|anmeldung/i.test(clean);
-    const weekday=source.match(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/i)?.[1];
-    const weekdayConflict=weekday&&new Date(start.date+'T12:00:00Z').getUTCDay()!==['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].indexOf(weekday.toLowerCase());
+    const weekday=source.match(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Sonntag|Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag)\b/i)?.[1]?.toLowerCase();
+    const weekdayIndex=weekday?Math.max(['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].indexOf(weekday),['sonntag','montag','dienstag','mittwoch','donnerstag','freitag','samstag'].indexOf(weekday)):-1;
+    // Only meaningful when one date is on the line; otherwise the weekday may belong to another date.
+    const weekdayConflict=weekdayIndex>=0&&parsed.length===1&&new Date(start.date+'T12:00:00Z').getUTCDay()!==weekdayIndex;
     const administrative=/regardless of|unabhängig/i.test(source)&&/examination date|prüfungstermin/i.test(source);
     const metadata=/^(?:Start Date|End Date|Valid (?:from|until)|Gültig (?:ab|bis))\s*:/i.test(source)||/licen[cs]e|Lizenz/i.test(mail.subject);
     const historical=/\b(?:lost|verloren|yesterday|gestern)\b/i.test(source+' '+mail.subject);
     const range=!!end&&end.date!==start.date;
+    const sentDay=hasReceived?`${referenceParts.year}-${pad(referenceParts.month)}-${pad(referenceParts.day)}`:'';
+    const beforeSent=!!sentDay&&(end?.date||start.date)<sentDay;
     if(/\b(?:today|heute)\b/i.test(r.text)&&!/meeting|event|at\s+\d|Uhr|workshop|session|Treffen|Vortrag|findet|statt/i.test(source))continue;
-    const warnings=[metadata?'Validity date — not an appointment':null,historical?'Historical reference — not an upcoming appointment':null,range?'Date range or opening window — choose the applicable day':null,hasAlternatives?'Alternative deadlines — check which applies to your module':null,attachedSchedule?'Check the attached schedule for your module':null,administrative?'Administrative examination date — actual assessment date may differ':null,cancelled?'Cancellation or rescheduling':null,!explicit?'Date inferred from the email date':null,!hasReceived&&!explicit?'Original email date is missing':null,ambiguousTime?'Confirm AM or PM':null,weekdayConflict?'Weekday conflicts with the inferred date':null,bookingWindow?'Availability window — book your own slot':null,timezoneAmbiguous?'Explicit time zone needs review':null,recurring?'Recurring schedule needs review':null].filter(Boolean);
+    const warnings=[metadata?'Validity date — not an appointment':null,historical||beforeSent?'Historical reference — not an upcoming appointment':null,range?'Date range or opening window — choose the applicable day':null,hasAlternatives?'Alternative deadlines — check which applies to your module':null,attachedSchedule?'Check the attached schedule for your module':null,administrative?'Administrative examination date — actual assessment date may differ':null,cancelled?'Cancellation or rescheduling':null,!explicit?'Date inferred from the email date':null,!hasReceived&&!explicit?'Original email date is missing':null,ambiguousTime?'Confirm AM or PM':null,weekdayConflict?'Weekday conflicts with the inferred date':null,bookingWindow?'Availability window — book your own slot':null,timezoneAmbiguous?'Explicit time zone needs review':null,recurring?'Recurring schedule needs review':null].filter(Boolean);
     const location=source.match(/Haus\s+[A-Z]\s*,?\s*(?:Raum|room)\s+[\w-]+|\bAudimax\b|\bEAZ\s+[\d/.-]+|\bTGZ\s*(?:\([^)]*\))?/i)?.[0]||'';
     const course=clean.match(/students on the ([^,.!\n]+)/i)?.[1];
     const title=/^New message from /i.test(mail.subject)&&/meeting|online/i.test(clean)?(course?course+' · ':'')+'Online meeting':mail.subject.replace(/^\[[^\]]+\]\s*/,'');
     events.push({title,startDate:start.date,startTime:start.time,endDate:end?.date||start.date,endTime:end?.time||'',source,location,cancelled,explicit,warnings,clear:explicit&&!warnings.length});
   }}
+  for(let i=events.length-1;i>=0;i--)if(!events[i].startTime&&events.some(e=>e!==events[i]&&e.startTime&&e.startDate===events[i].startDate))events.splice(i,1);
   const links=classifyLinks([...(mail.links||[]),...extractLinks(mail.body)]);
   for(const event of events)event.links=links.filter(l=>['Join meeting','Register / book'].includes(l.type));
   const eligibility=lines.filter(s=>/ausschließlich|only for|nur für|must be (?:a|an)|berechtigt/i.test(s));

@@ -18,7 +18,7 @@ No paid API, AI account or developer account is required. Core extraction works 
 
 ## Install
 
-1. Download `campus-post-0.3.7.zip` from Releases and extract it into a permanent folder.
+1. Download `campus-post-0.4.0.zip` from Releases and extract it into a permanent folder.
 2. Open your browser's Extensions page (`chrome://extensions` or `brave://extensions`), enable Developer mode, and choose **Load unpacked**.
 3. Select the extracted folder containing `manifest.json`.
 4. Refresh [TU webmail](https://webmail.tu-ilmenau.de/), sign in there and enable Campus Post's email tools after reading its disclosure.
